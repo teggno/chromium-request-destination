@@ -1,0 +1,187 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Reproducing Chromium request.destination bug</title>
+    <link rel="stylesheet" href="/styles.css" />
+    <script defer>
+      window.addEventListener("load", () => {
+        const cnsl = document.querySelector("#console");
+
+        navigator.serviceWorker.register("/serviceworker.js").catch((err) => {
+          console.error("Service worker registration failed: ", err);
+        });
+        navigator.serviceWorker.addEventListener("message", (event) => {
+          const line = document.createElement("div");
+          line.innerHTML = event.data.msg;
+          cnsl.appendChild(line);
+        });
+
+        document
+          .querySelectorAll(".clearConsole")
+          .forEach((e) => e.addEventListener("click", clearConsole));
+        function clearConsole() {
+          cnsl.innerHTML = "";
+        }
+
+        scenario1();
+        scenario2();
+      });
+
+      function scenario1() {
+        const formScenario1 = document.querySelector("#formScenario1");
+        const audioUrlScenario1 = document.querySelector("#audioUrlScenario1");
+        const audioScenario1 = document.querySelector("#audioScenario1");
+
+        audioUrlScenario1.value =
+          "https://hwcdn.libsyn.com/p/e/a/4/ea4ed600c7337f3b/Syntax299.mp3?c_id=87790187&cs_id=87790187&destination_id=532671&expiration=1606333847&hwt=2725e7815f94086d660c18129bfecbb2&bust=" +
+          new Date().valueOf().toString() +
+          "scenario1";
+        audioScenario1.src = audioUrlScenario1.value;
+        formScenario1.addEventListener("submit", (e) => {
+          e.preventDefault();
+          audioScenario1.src = audioUrlScenario1.value;
+        });
+      }
+
+      function scenario2() {
+        const playPauseButton = document.querySelector("#playPause");
+        const formScenario2 = document.querySelector("#formScenario2");
+        const audioUrlScenario2 = document.querySelector("#audioUrlScenario2");
+        const audioScenario2 = document.querySelector("#audioScenario2");
+
+        audioUrlScenario2.value =
+          "https://hwcdn.libsyn.com/p/e/a/4/ea4ed600c7337f3b/Syntax299.mp3?c_id=87790187&cs_id=87790187&destination_id=532671&expiration=1606333847&hwt=2725e7815f94086d660c18129bfecbb2&bust=" +
+          new Date().valueOf().toString() +
+          "scenario2";
+
+        audioScenario2.addEventListener("play", () => {
+          playPauseButton.innerHTML = "Loading...";
+          playPauseButton.disabled = true;
+        });
+
+        audioScenario2.addEventListener("playing", () => {
+          playPauseButton.innerHTML = "Pause";
+          playPauseButton.disabled = false;
+        });
+        audioScenario2.addEventListener("pause", () => {
+          playPauseButton.innerHTML = "Play";
+          playPauseButton.disabled = false;
+        });
+
+        formScenario2.addEventListener("submit", (e) => {
+          e.preventDefault();
+
+          if (audioScenario2.paused) {
+            if (audioScenario2.src !== audioUrlScenario2.value) {
+              audioScenario2.src = audioUrlScenario2.value;
+            }
+            audioScenario2.play();
+          } else {
+            audioScenario2.pause();
+          }
+        });
+      }
+    </script>
+    <link rel="icon" type="image/png" href="/favicon.png" />
+  </head>
+  <body>
+    <h1>This page aims to reproduce a Chromium issue</h1>
+    <h2>Issue Description</h2>
+    <p>
+      The <code>request.destination</code> that can be observed in a service
+      worker's <code>fetch</code> event handler is <code>video</code> instead of
+      <code>audio</code> when using an <code>&lt;audio&gt;</code> element in
+      certain circumstances. The two scenarios below describe such
+      circumstances.
+    </p>
+    <section>
+      <h3>Scenario 1</h3>
+      <p>
+        When an <code>&lt;audio&gt;</code> element gets its url set and is not
+        playing yet and then its play button is clicked, the
+        <code>request.destination</code> that can be observed in a service
+        worker's <code>fetch</code> event handler is <code>video</code> instead
+        of <code>audio</code>.
+      </p>
+      <h4>Steps to Reproduce</h4>
+      <ol>
+        <li>Refresh this page</li>
+        <li>Make sure the service worker is running</li>
+        <li>
+          The console (below) should show <br />
+          <code>request.destination: audio</code>
+        </li>
+        <li>Click <strong>Play</strong></li>
+        <li>
+          The console (below) should show:<br />
+          <code>request.destination: video</code>
+        </li>
+      </ol>
+      <div>
+        <audio controls id="audioScenario1" />
+      </div>
+      <form id="formScenario1">
+        <div>
+          <label for="audioUrlScenario1">Audio src</label>
+        </div>
+        <div class="inputAndButton">
+          <input type="url" id="audioUrlScenario1" required />
+          <button id="applyAudioUrl">Change</button>
+        </div>
+      </form>
+    </section>
+
+    <section>
+      <h3>Scenario 2</h3>
+      <p>
+        Originally, I've discovered the issue in a little more complex set up
+        which takes some more time to reproduce. To make sure this gets covered
+        too, here it is.
+      </p>
+      <h4>Steps to Reproduce</h4>
+      <ol>
+        <li>Refresh this page</li>
+        <li>Make sure the service worker is running</li>
+        <li><button class="clearConsole">Clear the console</button></li>
+        <li>
+          Click <strong>Play</strong> <br />The console (below) should show:<br />
+          <code>request.destination: audio</code>
+        </li>
+        <li>Click <strong>Pause</strong> (as soon as the button is enabled)</li>
+        <li>Wait for about 1 Minute, 40 Seconds</li>
+        <li>Click <strong>Play</strong> again</li>
+        <li>
+          The console (below) should show:<br />
+          <code>request.destination: video</code>. If it doesn't show anything
+          new, you haven't waited long enough. In that case, start at 1. again.
+        </li>
+      </ol>
+      <h4>Audio to Test</h4>
+
+      <form id="formScenario2">
+        <div>
+          <label for="audioUrlScenario2">Audio src</label>
+          <input type="url" id="audioUrlScenario2" required />
+        </div>
+        <button id="playPause">Play</button>
+      </form>
+      <div class="audioWrapper">
+        The <code>&lt;audio&gt;</code> tag is here
+        <audio id="audioScenario2" />
+      </div>
+    </section>
+    <div id="consoleWrapper">
+      <div>
+        <h2>Console</h2>
+        <p>
+          Console output from the service worker's <code>fetch</code> event
+          handler:
+        </p>
+      </div>
+      <button class="clearConsole">Clear</button>
+      <div id="console"></div>
+    </div>
+  </body>
+</html>
