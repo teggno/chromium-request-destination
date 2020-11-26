@@ -10,7 +10,7 @@
         const cnsl = document.querySelector("#console");
 
         navigator.serviceWorker
-          .register("/serviceworker.js", {
+          .register("serviceworker.js", {
             scope: window.location.pathname || "/",
           })
           .catch((err) => {
