@@ -9,9 +9,13 @@
       window.addEventListener("load", () => {
         const cnsl = document.querySelector("#console");
 
-        navigator.serviceWorker.register("/serviceworker.js").catch((err) => {
-          console.error("Service worker registration failed: ", err);
-        });
+        navigator.serviceWorker
+          .register("/serviceworker.js", {
+            scope: window.location.pathname || "/",
+          })
+          .catch((err) => {
+            console.error("Service worker registration failed: ", err);
+          });
         navigator.serviceWorker.addEventListener("message", (event) => {
           const line = document.createElement("div");
           line.innerHTML = event.data.msg;
